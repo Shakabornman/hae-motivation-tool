@@ -22,8 +22,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1a2332;mi
 .step-line{width:24px;height:2px;background:#e2e8f0;flex-shrink:0}
 .step.active .step-circle{background:#1a3a5c;border-color:#1a3a5c;color:#fff}
 .step.active .step-label{color:#1a3a5c}
-.step.done .step-circle{background:#2f855a;border-color:#2f855a;color:#fff}
-.step.done .step-label{color:#2f855a}
+.step.done .step-circle{background:#2f855a;border-color:#2f855a;color:#fff;cursor:pointer}
+.step.done .step-label{color:#2f855a;cursor:pointer}
+.step.done:hover .step-circle{background:#276749;border-color:#276749}
 
 /* MAIN */
 .main{max-width:860px;margin:28px auto;padding:0 20px 60px}
@@ -342,13 +343,45 @@ let currentStep = 0;
 let aiData = {};
 let extraSymptoms = [];
 let dayCount = 0;
+let highestStep = 0; // tracks furthest step reached
 
 const STEPS = 6;
 
+// Save text/select field values before leaving a step
+function saveStepState() {
+  const fields = ['f-bp','f-pulse','f-resp','f-temp','f-spo2','f-glucose',
+    'f-chest','f-abdo','f-cns','f-other-exam',
+    'f-crp','f-wcc','f-neut','f-eosino','f-plt','f-hba1c','f-pct','f-hb','f-other-inv',
+    'f-treatment','f-discharge-meds','f-los-days','f-los-reason','f-discharge-plan',
+    'motType','caseText'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.dataset.saved = el.value;
+  });
+}
+
+// Restore saved values when returning to a step
+function restoreStepState() {
+  const fields = ['f-bp','f-pulse','f-resp','f-temp','f-spo2','f-glucose',
+    'f-chest','f-abdo','f-cns','f-other-exam',
+    'f-crp','f-wcc','f-neut','f-eosino','f-plt','f-hba1c','f-pct','f-hb','f-other-inv',
+    'f-treatment','f-discharge-meds','f-los-days','f-los-reason','f-discharge-plan',
+    'motType','caseText'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.dataset.saved !== undefined) el.value = el.dataset.saved;
+  });
+}
+
 function goStep(n) {
+  // Only allow jumping to steps already reached
+  if (n > highestStep + 1) return;
+  saveStepState();
   document.getElementById('step-' + currentStep).style.display = 'none';
   currentStep = n;
+  if (n > highestStep) highestStep = n;
   document.getElementById('step-' + n).style.display = 'block';
+  restoreStepState();
   updateStepper();
   window.scrollTo({top: 0, behavior: 'smooth'});
   if (n === 4) {
@@ -362,8 +395,18 @@ function updateStepper() {
     const el = document.getElementById('s' + i);
     if (!el) continue;
     el.className = 'step';
-    if (i < currentStep) el.classList.add('done');
-    else if (i === currentStep) el.classList.add('active');
+    if (i < currentStep) {
+      el.classList.add('done');
+      el.style.cursor = 'pointer';
+      el.onclick = () => goStep(i);
+    } else if (i === currentStep) {
+      el.classList.add('active');
+      el.style.cursor = 'default';
+      el.onclick = null;
+    } else {
+      el.style.cursor = i <= highestStep + 1 ? 'pointer' : 'default';
+      if (i <= highestStep) el.onclick = () => goStep(i);
+    }
   }
 }
 
