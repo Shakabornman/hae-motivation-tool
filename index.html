@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HAE Motivation Assistant</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1a2332;min-height:100vh}
+
+.header{background:#1a3a5c;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #c8a951}
+.header-left .org{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#c8a951}
+.header-left .title{font-size:17px;font-weight:600;color:#fff}
+.header-right{display:flex;align-items:center;gap:10px}
+.version-badge{font-size:10px;background:#c8a951;color:#1a3a5c;padding:3px 10px;border-radius:20px;font-weight:700}
+
+/* STEPPER */
+.stepper{background:#fff;border-bottom:1px solid #d0d8e4;padding:16px 28px;display:flex;align-items:center;gap:0;overflow-x:auto}
+.step{display:flex;align-items:center;gap:0;flex-shrink:0}
+.step-circle{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #cbd5e0;color:#a0aec0;background:#fff;transition:all .2s;flex-shrink:0}
+.step-label{font-size:11px;font-weight:600;color:#a0aec0;margin:0 8px;white-space:nowrap;transition:color .2s}
+.step-line{width:24px;height:2px;background:#e2e8f0;flex-shrink:0}
+.step.active .step-circle{background:#1a3a5c;border-color:#1a3a5c;color:#fff}
+.step.active .step-label{color:#1a3a5c}
+.step.done .step-circle{background:#2f855a;border-color:#2f855a;color:#fff}
+.step.done .step-label{color:#2f855a}
+
+/* MAIN */
+.main{max-width:860px;margin:28px auto;padding:0 20px 60px}
+
+.card{background:#fff;border-radius:10px;border:1px solid #d0d8e4;padding:28px 32px;margin-bottom:20px}
+.card-title{font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:6px}
+.card-sub{font-size:13px;color:#718096;margin-bottom:20px;line-height:1.5}
+
+/* TEXTAREA */
+.big-input{width:100%;padding:14px 16px;border:1.5px solid #cbd5e0;border-radius:8px;font-size:14px;font-family:inherit;line-height:1.7;resize:vertical;min-height:140px;color:#1a2332;transition:border-color .15s}
+.big-input:focus{outline:none;border-color:#1a3a5c;background:#fafcff}
+.big-input::placeholder{color:#a0aec0}
+
+/* AI BUTTON */
+.ai-btn{display:inline-flex;align-items:center;gap:8px;background:#1a3a5c;color:#fff;border:none;border-radius:7px;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:background .15s;margin-top:14px}
+.ai-btn:hover{background:#2a4f7c}
+.ai-btn:disabled{background:#a0aec0;cursor:not-allowed}
+.ai-btn .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+.ai-btn.loading .spinner{display:block}
+.ai-btn.loading .btn-text{opacity:.7}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* DIAGNOSIS CARDS */
+.dx-list{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.dx-card{border:1.5px solid #c3d4e8;border-radius:8px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;cursor:pointer;transition:all .15s;background:#f8fbff}
+.dx-card.selected{border-color:#1a3a5c;background:#eef3f8}
+.dx-card.rejected{border-color:#e2e8f0;background:#f9f9f9;opacity:.5}
+.dx-check{width:20px;height:20px;border-radius:4px;border:2px solid #cbd5e0;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .15s}
+.dx-card.selected .dx-check{background:#1a3a5c;border-color:#1a3a5c;color:#fff}
+.dx-card-body{flex:1}
+.dx-name{font-size:14px;font-weight:600;color:#1a2332}
+.dx-code{display:inline-block;font-size:11px;font-family:monospace;background:#e8f0f8;color:#1a3a5c;border:1px solid #b8cfe0;border-radius:4px;padding:2px 7px;margin:4px 4px 0 0;font-weight:700}
+.dx-reason{font-size:12px;color:#718096;margin-top:4px;line-height:1.4}
+.dx-card .edit-btn{background:none;border:1px solid #e2e8f0;color:#718096;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;flex-shrink:0;margin-top:2px}
+.dx-card .edit-btn:hover{border-color:#1a3a5c;color:#1a3a5c}
+
+.add-custom-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:1px dashed #1a3a5c;color:#1a3a5c;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px}
+.add-custom-btn:hover{background:#eef3f8}
+
+/* FORM FIELDS */
+.field-group{margin-bottom:14px}
+.field-group label{display:block;font-size:11px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.field-group input,.field-group select,.field-group textarea{width:100%;padding:8px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;font-family:inherit;color:#1a2332;background:#fdfdfd;transition:border-color .15s}
+.field-group input:focus,.field-group select:focus,.field-group textarea:focus{outline:none;border-color:#1a3a5c}
+.field-group textarea{resize:vertical;line-height:1.5}
+.field-group .hint{font-size:11px;color:#a0aec0;margin-top:3px}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* VALIDATION */
+.validation-banner{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:7px;margin-bottom:16px;font-size:13px;line-height:1.5}
+.validation-banner.warn{background:#fffbeb;border:1px solid #f6e05e;color:#744210}
+.validation-banner.ok{background:#f0fff4;border:1px solid #9ae6b4;color:#22543d}
+.validation-banner.error{background:#fff5f5;border:1px solid #feb2b2;color:#742a2a}
+.val-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+
+/* CHIPS */
+.chip-grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}
+.chip{display:flex;align-items:center;gap:5px;background:#eef3f8;border:1px solid #c3d4e8;border-radius:20px;padding:4px 11px;font-size:12px;color:#1a3a5c;cursor:pointer;user-select:none;transition:all .15s}
+.chip.active{background:#1a3a5c;color:#fff;border-color:#1a3a5c}
+.chip:hover:not(.active){background:#d8e8f4}
+
+/* NAV BUTTONS */
+.nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:24px;gap:12px}
+.btn-back{background:#fff;border:1px solid #cbd5e0;color:#4a5568;border-radius:7px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-back:hover{border-color:#1a3a5c;color:#1a3a5c}
+.btn-next{background:#1a3a5c;color:#fff;border:none;border-radius:7px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.4px;transition:background .15s}
+.btn-next:hover{background:#2a4f7c}
+.btn-generate{background:#c8a951;color:#1a2332;border:none;border-radius:7px;padding:11px 28px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.4px;transition:background .15s}
+.btn-generate:hover{background:#b8992e}
+
+/* PROGRESS BAR */
+.progress-bar-wrap{margin-bottom:6px}
+.progress-bar-track{height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+.progress-bar-fill{height:100%;background:#1a3a5c;border-radius:4px;transition:width .3s}
+.progress-label{font-size:11px;color:#718096;margin-top:4px;text-align:right}
+
+/* OUTPUT */
+.output-box{background:#f8fafc;border:1px solid #d0d8e4;border-radius:8px;padding:24px 28px;font-family:'Courier New',monospace;font-size:13px;line-height:1.9;white-space:pre-wrap;color:#1a2332;min-height:360px}
+.output-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.out-btn{border:none;border-radius:6px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+.out-btn.copy{background:#1a3a5c;color:#fff}
+.out-btn.copy:hover{background:#2a4f7c}
+.out-btn.copy.copied{background:#2f855a}
+.out-btn.pdf{background:#c8a951;color:#1a2332}
+.out-btn.pdf:hover{background:#b8992e}
+.out-btn.restart{background:#fff;border:1px solid #cbd5e0;color:#4a5568}
+.out-btn.restart:hover{border-color:#e53e3e;color:#e53e3e}
+
+/* DAY BLOCKS */
+.day-block{background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:12px 14px;margin-bottom:10px;position:relative}
+.day-block .day-lbl{font-size:11px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.day-block .rm-day{position:absolute;top:10px;right:12px;background:none;border:none;color:#a0aec0;cursor:pointer;font-size:15px}
+.day-block .rm-day:hover{color:#e53e3e}
+
+/* PRINT */
+@media print{
+  .header,.stepper,.nav-row,.output-actions,.progress-bar-wrap{display:none!important}
+  .main{margin:0;padding:0;max-width:100%}
+  .card{border:none;padding:0;margin:0}
+  .card-title,.card-sub{display:none}
+  .output-box{border:none;padding:0;font-size:11pt;background:white}
+  .print-hdr{display:block!important}
+}
+.print-hdr{display:none;text-align:center;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #1a3a5c}
+.print-hdr .ph1{font-size:15pt;font-weight:700;letter-spacing:2px;color:#1a3a5c}
+.print-hdr .ph2{font-size:9pt;color:#555;letter-spacing:1px;text-transform:uppercase;margin-top:3px}
+.print-hdr .ph3{font-size:9pt;color:#888;margin-top:5px}
+
+.tag{display:inline-flex;align-items:center;gap:5px;background:#eef3f8;border:1px solid #c3d4e8;border-radius:4px;padding:3px 9px;font-size:12px;color:#1a3a5c;margin:3px 3px 0 0}
+.tag .rm{background:none;border:none;cursor:pointer;color:#718096;font-size:11px;padding:0 1px}
+.tag .rm:hover{color:#e53e3e}
+
+.section-sep{border:none;border-top:1px solid #e2e8f0;margin:20px 0}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="org">Hospital at Ekhaya</div>
+    <div class="title">Medical Motivation Assistant</div>
+  </div>
+  <div class="header-right">
+    <span class="version-badge">AI-Assisted v2.0</span>
+  </div>
+</div>
+
+<div class="stepper" id="stepper">
+  <div class="step active" id="s0"><div class="step-circle">1</div><div class="step-label">Case Description</div></div>
+  <div class="step-line"></div>
+  <div class="step" id="s1"><div class="step-circle">2</div><div class="step-label">Diagnoses</div></div>
+  <div class="step-line"></div>
+  <div class="step" id="s2"><div class="step-circle">3</div><div class="step-label">Vitals &amp; Exam</div></div>
+  <div class="step-line"></div>
+  <div class="step" id="s3"><div class="step-circle">4</div><div class="step-label">Investigations</div></div>
+  <div class="step-line"></div>
+  <div class="step" id="s4"><div class="step-circle">5</div><div class="step-label">Treatment &amp; LOS</div></div>
+  <div class="step-line"></div>
+  <div class="step" id="s5"><div class="step-circle">6</div><div class="step-label">Motivation</div></div>
+</div>
+
+<div class="main">
+
+<!-- ===== STEP 1: CASE DESCRIPTION ===== -->
+<div id="step-0">
+  <div class="card">
+    <div class="card-title">Describe the case in plain language</div>
+    <div class="card-sub">Write what you know — age, sex, symptoms, vitals, history. The AI will read this and suggest diagnoses with ICD-10 codes, and pre-fill what it can into the following steps.</div>
+    <div class="field-group">
+      <label>Motivation type</label>
+      <select id="motType">
+        <option value="initial">Initial Admission</option>
+        <option value="extended">Extended Stay / Re-authorisation</option>
+      </select>
+    </div>
+    <textarea class="big-input" id="caseText" placeholder="e.g. 38 year old female, previously healthy. Came in with vomiting, epigastric pain, headache and dizziness. BP 162/100, pulse 89. Abdomen: severe epigastric tenderness, positive bowel sounds. CRP 71.8 increased. Referred for gastroscopy — generalised gastritis found. Request 5 days for IV treatment and BP control."></textarea>
+    <button class="ai-btn" id="analyseBtn" onclick="analyseCase()">
+      <div class="spinner"></div>
+      <span class="btn-text">✦ Analyse Case &amp; Suggest Diagnoses</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== STEP 2: DIAGNOSES ===== -->
+<div id="step-1" style="display:none">
+  <div class="card">
+    <div class="card-title">Review suggested diagnoses</div>
+    <div class="card-sub">The AI has suggested the following diagnoses and ICD-10 codes based on your case description. Select those that apply, deselect any that don't. You can add your own below.</div>
+    <div id="dx-suggestions" class="dx-list"></div>
+    <button class="add-custom-btn" onclick="addCustomDx()">+ Add diagnosis manually</button>
+    <div id="custom-dx-area" style="margin-top:14px"></div>
+  </div>
+  <div class="nav-row">
+    <button class="btn-back" onclick="goStep(0)">← Back</button>
+    <button class="btn-next" onclick="goStep(2)">Next: Vitals &amp; Exam →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 3: VITALS & EXAM ===== -->
+<div id="step-2" style="display:none">
+  <div class="card">
+    <div class="card-title">Vitals &amp; Examination</div>
+    <div class="card-sub">Fields pre-filled where the AI found values in your description. Check, correct, and complete.</div>
+    <div id="vitals-validation"></div>
+    <div class="grid-3">
+      <div class="field-group"><label>BP (mmHg)</label><input type="text" id="f-bp" placeholder="e.g. 162/102"></div>
+      <div class="field-group"><label>Pulse (bpm)</label><input type="number" id="f-pulse" placeholder="e.g. 113"></div>
+      <div class="field-group"><label>Resp Rate</label><input type="number" id="f-resp" placeholder="e.g. 25"></div>
+      <div class="field-group"><label>Temp (°C)</label><input type="text" id="f-temp" placeholder="e.g. 38.4"></div>
+      <div class="field-group"><label>O₂ Sat (%)</label><input type="number" id="f-spo2" placeholder="e.g. 89"></div>
+      <div class="field-group"><label>Blood Glucose</label><input type="text" id="f-glucose" placeholder="e.g. 27 mmol/L"></div>
+    </div>
+    <hr class="section-sep">
+    <div class="field-group"><label>Chest findings</label><input type="text" id="f-chest" placeholder="e.g. Wheeze, bilateral creps"></div>
+    <div class="field-group"><label>Abdomen findings</label><input type="text" id="f-abdo" placeholder="e.g. Epigastric tenderness, (+) bowel sounds"></div>
+    <div class="field-group"><label>CNS findings</label><input type="text" id="f-cns" placeholder="e.g. No focal signs"></div>
+    <div class="field-group"><label>Other findings</label><input type="text" id="f-other-exam" placeholder="e.g. Generalised oedema"></div>
+    <hr class="section-sep">
+    <div class="field-group"><label>Presenting symptoms</label>
+      <div class="hint" style="margin-bottom:8px;font-size:11px;color:#718096">Pre-selected from your description. Tap to add or remove.</div>
+      <div class="chip-grid" id="sym-chips">
+        <div class="chip" onclick="toggleChip(this)">Fever</div>
+        <div class="chip" onclick="toggleChip(this)">Chills</div>
+        <div class="chip" onclick="toggleChip(this)">Productive cough</div>
+        <div class="chip" onclick="toggleChip(this)">Shortness of breath</div>
+        <div class="chip" onclick="toggleChip(this)">Chest pain</div>
+        <div class="chip" onclick="toggleChip(this)">Abdominal pain</div>
+        <div class="chip" onclick="toggleChip(this)">Epigastric pain</div>
+        <div class="chip" onclick="toggleChip(this)">Vomiting</div>
+        <div class="chip" onclick="toggleChip(this)">Diarrhoea</div>
+        <div class="chip" onclick="toggleChip(this)">Headache</div>
+        <div class="chip" onclick="toggleChip(this)">Dizziness</div>
+        <div class="chip" onclick="toggleChip(this)">Blurry vision</div>
+        <div class="chip" onclick="toggleChip(this)">Decreased appetite</div>
+        <div class="chip" onclick="toggleChip(this)">Nausea</div>
+        <div class="chip" onclick="toggleChip(this)">Suprapubic pain</div>
+        <div class="chip" onclick="toggleChip(this)">Renal angle tenderness</div>
+        <div class="chip" onclick="toggleChip(this)">Night sweats</div>
+        <div class="chip" onclick="toggleChip(this)">Weight loss</div>
+        <div class="chip" onclick="toggleChip(this)">Palpitations</div>
+        <div class="chip" onclick="toggleChip(this)">Oedema</div>
+        <div class="chip" onclick="toggleChip(this)">Dysuria</div>
+        <div class="chip" onclick="toggleChip(this)">Wheeze</div>
+        <div class="chip" onclick="toggleChip(this)">Haemoptysis</div>
+        <div class="chip" onclick="toggleChip(this)">Polyuria</div>
+      </div>
+      <input type="text" id="extra-sym-input" placeholder="Type extra symptom and press Enter" onkeydown="addExtraSym(event)" style="margin-top:8px">
+      <div id="extra-sym-tags" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px"></div>
+    </div>
+  </div>
+  <div class="nav-row">
+    <button class="btn-back" onclick="goStep(1)">← Back</button>
+    <button class="btn-next" onclick="goStep(3)">Next: Investigations →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 4: INVESTIGATIONS ===== -->
+<div id="step-3" style="display:none">
+  <div class="card">
+    <div class="card-title">Investigation Results</div>
+    <div class="card-sub">Enter blood results and any other investigation findings. Pre-filled where values were found in your description.</div>
+    <div id="inv-validation"></div>
+    <div class="grid-2">
+      <div class="field-group"><label>CRP</label><input type="text" id="f-crp" placeholder="e.g. 117.7 (increased)"></div>
+      <div class="field-group"><label>WCC</label><input type="text" id="f-wcc" placeholder="e.g. 17.15 (increased)"></div>
+      <div class="field-group"><label>Neutrophils</label><input type="text" id="f-neut" placeholder="e.g. 15.4 (increased)"></div>
+      <div class="field-group"><label>Eosinophils</label><input type="text" id="f-eosino" placeholder="e.g. Increased"></div>
+      <div class="field-group"><label>Platelets</label><input type="text" id="f-plt" placeholder="e.g. 425"></div>
+      <div class="field-group"><label>HbA1c</label><input type="text" id="f-hba1c" placeholder="e.g. 14.6 (increased)"></div>
+      <div class="field-group"><label>PCT</label><input type="text" id="f-pct" placeholder="e.g. 4.52"></div>
+      <div class="field-group"><label>Haemoglobin</label><input type="text" id="f-hb" placeholder="e.g. 9.8 (low)"></div>
+    </div>
+    <div class="field-group"><label>Other investigations</label><textarea id="f-other-inv" rows="2" placeholder="e.g. Gastroscopy: generalised gastritis&#10;Urine dipstick: nitrites +, leucocytes ++"></textarea></div>
+  </div>
+  <div class="nav-row">
+    <button class="btn-back" onclick="goStep(2)">← Back</button>
+    <button class="btn-next" onclick="goStep(4)">Next: Treatment &amp; LOS →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 5: TREATMENT & LOS ===== -->
+<div id="step-4" style="display:none">
+  <div class="card">
+    <div class="card-title">Treatment &amp; Length of Stay</div>
+    <div class="card-sub">Complete treatment details and the LOS request. Pre-filled where the AI found relevant information.</div>
+    <div id="treat-validation"></div>
+
+    <div class="field-group"><label>IV / Inpatient treatment</label><textarea id="f-treatment" rows="2" placeholder="e.g. IV Rocephin, IVI supportive treatment, glucose control"></textarea></div>
+    <div class="field-group"><label>Discharge medication</label><input type="text" id="f-discharge-meds" placeholder="e.g. Oral antibiotics, antihypertensives, Metformin 880mg"></div>
+
+    <div id="progress-section" style="display:none">
+      <hr class="section-sep">
+      <div style="font-size:12px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Day-by-Day Progress</div>
+      <div id="day-list"></div>
+      <button class="add-custom-btn" onclick="addDay()">+ Add progress day</button>
+    </div>
+
+    <hr class="section-sep">
+    <div class="grid-2">
+      <div class="field-group"><label>Days requested</label><input type="number" id="f-los-days" placeholder="e.g. 5"></div>
+      <div class="field-group"><label>Reason for LOS</label><input type="text" id="f-los-reason" placeholder="e.g. IV antibiotics + BP control"></div>
+    </div>
+    <div class="field-group"><label>Discharge plan</label><input type="text" id="f-discharge-plan" placeholder="e.g. Discharged on oral antibiotics and antihypertensives"></div>
+  </div>
+  <div class="nav-row">
+    <button class="btn-back" onclick="goStep(3)">← Back</button>
+    <button class="btn-generate" onclick="generateMotivation()">✦ Generate Motivation</button>
+  </div>
+</div>
+
+<!-- ===== STEP 6: OUTPUT ===== -->
+<div id="step-5" style="display:none">
+  <div class="card">
+    <div class="print-hdr">
+      <div class="ph1">HOSPITAL AT EKHAYA</div>
+      <div class="ph2">Medical Aid Motivation — Case Management</div>
+      <div class="ph3" id="print-date"></div>
+    </div>
+    <div class="card-title">Generated Motivation</div>
+    <div class="card-sub">Review before submitting to medical aid. Copy the text or export as PDF.</div>
+    <div class="output-box" id="output-box"></div>
+    <div class="output-actions">
+      <button class="out-btn copy" id="copyBtn" onclick="copyOut()">Copy Text</button>
+      <button class="out-btn pdf" onclick="exportPDF()">Export PDF</button>
+      <button class="out-btn restart" onclick="restart()">Start New Motivation</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- end main -->
+
+<script>
+let currentStep = 0;
+let aiData = {};
+let extraSymptoms = [];
+let dayCount = 0;
+
+const STEPS = 6;
+
+function goStep(n) {
+  document.getElementById('step-' + currentStep).style.display = 'none';
+  currentStep = n;
+  document.getElementById('step-' + n).style.display = 'block';
+  updateStepper();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  if (n === 4) {
+    const mt = document.getElementById('motType').value;
+    document.getElementById('progress-section').style.display = mt === 'extended' ? 'block' : 'none';
+  }
+}
+
+function updateStepper() {
+  for (let i = 0; i < STEPS; i++) {
+    const el = document.getElementById('s' + i);
+    if (!el) continue;
+    el.className = 'step';
+    if (i < currentStep) el.classList.add('done');
+    else if (i === currentStep) el.classList.add('active');
+  }
+}
+
+function toggleChip(el) { el.classList.toggle('active'); }
+
+function addExtraSym(e) {
+  if (e.key !== 'Enter' && e.key !== 'Tab') return;
+  e.preventDefault();
+  const input = document.getElementById('extra-sym-input');
+  const val = input.value.trim();
+  if (!val) return;
+  extraSymptoms.push(val);
+  renderExtraTags();
+  input.value = '';
+}
+
+function renderExtraTags() {
+  const c = document.getElementById('extra-sym-tags');
+  c.innerHTML = '';
+  extraSymptoms.forEach((s, i) => {
+    const t = document.createElement('div');
+    t.className = 'tag';
+    t.innerHTML = `${s}<button class="rm" onclick="removeExtraSym(${i})">✕</button>`;
+    c.appendChild(t);
+  });
+}
+
+function removeExtraSym(i) { extraSymptoms.splice(i, 1); renderExtraTags(); }
+
+async function analyseCase() {
+  const text = document.getElementById('caseText').value.trim();
+  if (!text) { alert('Please describe the case first.'); return; }
+
+  const btn = document.getElementById('analyseBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  const prompt = `You are a South African clinical coding assistant for a private hospital. Analyse this case description and extract structured clinical data.
+
+Case description:
+"${text}"
+
+Respond ONLY with valid JSON in this exact structure (no markdown, no explanation):
+{
+  "diagnoses": [
+    {
+      "name": "Full diagnosis name",
+      "codes": ["ICD10code1", "ICD10code2"],
+      "reason": "Brief clinical reasoning (1 sentence)",
+      "confidence": "high|medium|low"
+    }
+  ],
+  "extracted": {
+    "age": "",
+    "sex": "",
+    "bp": "",
+    "pulse": "",
+    "resp": "",
+    "temp": "",
+    "spo2": "",
+    "glucose": "",
+    "crp": "",
+    "wcc": "",
+    "hba1c": "",
+    "pct": "",
+    "chest": "",
+    "abdomen": "",
+    "cns": "",
+    "treatment": "",
+    "discharge_meds": "",
+    "los_days": "",
+    "los_reason": "",
+    "symptoms": []
+  }
+}
+
+Rules:
+- Use correct ICD-10 codes for South African private hospital billing
+- List primary diagnosis first, then secondary/comorbid conditions
+- Extract any numbers/values mentioned for vitals and bloods
+- symptoms array: list each presenting symptom as a short string
+- If a value is not mentioned, leave it as empty string
+- Confidence: high = clearly stated, medium = implied, low = inferred`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+    aiData = JSON.parse(raw);
+
+    renderDiagnoses(aiData.diagnoses);
+    prefillFields(aiData.extracted);
+
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    goStep(1);
+
+  } catch (err) {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    alert('Analysis failed. Please check your internet connection and try again.\n\nError: ' + err.message);
+  }
+}
+
+function renderDiagnoses(diagnoses) {
+  const container = document.getElementById('dx-suggestions');
+  container.innerHTML = '';
+
+  if (!diagnoses || diagnoses.length === 0) {
+    container.innerHTML = '<div style="color:#718096;font-size:13px;padding:12px 0">No diagnoses could be extracted. Please add manually below.</div>';
+    return;
+  }
+
+  diagnoses.forEach((dx, i) => {
+    const card = document.createElement('div');
+    card.className = 'dx-card selected';
+    card.dataset.idx = i;
+    const confColor = dx.confidence === 'high' ? '#2f855a' : dx.confidence === 'medium' ? '#c05621' : '#718096';
+    const codesHtml = (dx.codes || []).map(c => `<span class="dx-code">${c}</span>`).join('');
+    card.innerHTML = `
+      <div class="dx-check">✓</div>
+      <div class="dx-card-body">
+        <div class="dx-name">${dx.name}</div>
+        <div style="margin-top:4px">${codesHtml}<span style="font-size:10px;color:${confColor};margin-left:6px;font-weight:600;text-transform:uppercase">${dx.confidence} confidence</span></div>
+        <div class="dx-reason">${dx.reason || ''}</div>
+      </div>
+      <button class="edit-btn" onclick="event.stopPropagation();editDx(${i})">Edit</button>`;
+    card.onclick = () => {
+      card.classList.toggle('selected');
+      card.classList.toggle('rejected');
+      card.querySelector('.dx-check').textContent = card.classList.contains('selected') ? '✓' : '';
+    };
+    container.appendChild(card);
+  });
+}
+
+function editDx(i) {
+  const card = document.querySelectorAll('.dx-card')[i];
+  const nameEl = card.querySelector('.dx-name');
+  const codesEl = card.querySelectorAll('.dx-code');
+  const currentName = nameEl.textContent;
+  const currentCodes = Array.from(codesEl).map(c => c.textContent).join(', ');
+  const newName = prompt('Edit diagnosis name:', currentName);
+  if (newName !== null) nameEl.textContent = newName;
+  const newCodes = prompt('Edit ICD-10 codes (comma separated):', currentCodes);
+  if (newCodes !== null) {
+    const codesContainer = card.querySelector('.dx-card-body div:nth-child(2)');
+    const parts = newCodes.split(',').map(c => c.trim()).filter(Boolean);
+    const existing = codesContainer.querySelectorAll('.dx-code');
+    existing.forEach(e => e.remove());
+    const spans = parts.map(c => `<span class="dx-code">${c}</span>`).join('');
+    codesContainer.insertAdjacentHTML('afterbegin', spans);
+  }
+}
+
+let customDxCount = 0;
+function addCustomDx() {
+  customDxCount++;
+  const area = document.getElementById('custom-dx-area');
+  const block = document.createElement('div');
+  block.className = 'dx-block';
+  block.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:12px 14px;margin-bottom:8px;position:relative';
+  block.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="text" placeholder="Diagnosis name" class="custom-dx-name" style="flex:1;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px">
+      <button onclick="this.closest('.dx-block').remove()" style="background:none;border:1px solid #e2e8f0;border-radius:4px;color:#a0aec0;cursor:pointer;padding:5px 8px;font-size:12px">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+      <input type="text" placeholder="ICD-10 code" class="custom-dx-code" style="width:140px;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:12px;font-family:monospace" onkeydown="if(event.key==='Enter'){addCustomCode(this)}">
+      <button onclick="addCustomCode(this.previousElementSibling)" class="icd-add-btn" style="background:#eef3f8;border:1px solid #b8cfe0;color:#1a3a5c;border-radius:4px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">+ Add Code</button>
+    </div>
+    <div class="custom-codes-row" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>`;
+  area.appendChild(block);
+}
+
+function addCustomCode(input) {
+  const val = input.value.trim().toUpperCase();
+  if (!val) return;
+  const row = input.closest('.dx-block').querySelector('.custom-codes-row');
+  const chip = document.createElement('span');
+  chip.className = 'dx-code';
+  chip.style.cursor = 'pointer';
+  chip.title = 'Click to remove';
+  chip.textContent = val;
+  chip.onclick = () => chip.remove();
+  row.appendChild(chip);
+  input.value = '';
+  input.focus();
+}
+
+function prefillFields(extracted) {
+  if (!extracted) return;
+  const map = {
+    'f-bp': extracted.bp, 'f-pulse': extracted.pulse, 'f-resp': extracted.resp,
+    'f-temp': extracted.temp, 'f-spo2': extracted.spo2, 'f-glucose': extracted.glucose,
+    'f-crp': extracted.crp, 'f-wcc': extracted.wcc, 'f-hba1c': extracted.hba1c,
+    'f-pct': extracted.pct, 'f-chest': extracted.chest, 'f-abdo': extracted.abdomen,
+    'f-cns': extracted.cns, 'f-treatment': extracted.treatment,
+    'f-discharge-meds': extracted.discharge_meds,
+    'f-los-days': extracted.los_days, 'f-los-reason': extracted.los_reason
+  };
+  Object.entries(map).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el && val) el.value = val;
+  });
+
+  // Pre-select symptom chips
+  if (extracted.symptoms && extracted.symptoms.length > 0) {
+    const chips = document.querySelectorAll('#sym-chips .chip');
+    chips.forEach(chip => {
+      const chipText = chip.textContent.toLowerCase().trim();
+      if (extracted.symptoms.some(s => s.toLowerCase().includes(chipText) || chipText.includes(s.toLowerCase()))) {
+        chip.classList.add('active');
+      }
+    });
+    // Add symptoms not in chips
+    extracted.symptoms.forEach(sym => {
+      const chips = document.querySelectorAll('#sym-chips .chip');
+      const found = Array.from(chips).some(c => c.textContent.toLowerCase().includes(sym.toLowerCase()));
+      if (!found && sym.length > 2) {
+        if (!extraSymptoms.includes(sym)) { extraSymptoms.push(sym); }
+      }
+    });
+    renderExtraTags();
+  }
+}
+
+function getSelectedDiagnoses() {
+  const results = [];
+  // From AI suggestions
+  document.querySelectorAll('#dx-suggestions .dx-card.selected').forEach(card => {
+    const name = card.querySelector('.dx-name').textContent.trim();
+    const codes = Array.from(card.querySelectorAll('.dx-code')).map(c => c.textContent.trim());
+    if (name) results.push({ name, codes });
+  });
+  // From custom additions
+  document.querySelectorAll('#custom-dx-area .dx-block').forEach(block => {
+    const name = block.querySelector('.custom-dx-name').value.trim();
+    const codes = Array.from(block.querySelectorAll('.custom-codes-row .dx-code')).map(c => c.textContent.trim());
+    if (name) results.push({ name, codes });
+  });
+  return results;
+}
+
+function gv(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+let dayBlockCount = 0;
+function addDay() {
+  dayBlockCount++;
+  const dn = dayBlockCount + 1;
+  const list = document.getElementById('day-list');
+  const block = document.createElement('div');
+  block.className = 'day-block';
+  block.innerHTML = `
+    <div class="day-lbl">Day ${dn}</div>
+    <button class="rm-day" onclick="this.parentElement.remove()">×</button>
+    <div class="grid-2">
+      <div class="field-group"><label>BP</label><input type="text" placeholder="e.g. 168/115" class="day-bp" style="width:100%;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px"></div>
+      <div class="field-group"><label>Glucose</label><input type="text" placeholder="e.g. 18.2 mmol/L" class="day-gluc" style="width:100%;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px"></div>
+    </div>
+    <div class="field-group"><label>Progress notes</label><textarea rows="2" class="day-notes" placeholder="e.g. Epigastric pain improved. Tolerating oral feeds." style="width:100%;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical"></textarea></div>`;
+  list.appendChild(block);
+}
+
+function generateMotivation() {
+  const dxList = getSelectedDiagnoses();
+  const mt = document.getElementById('motType').value;
+
+  const activeChips = Array.from(document.querySelectorAll('#sym-chips .chip.active')).map(c => c.textContent.trim());
+  const symptoms = [...activeChips, ...extraSymptoms];
+
+  const bp = gv('f-bp'), pulse = gv('f-pulse'), resp = gv('f-resp'), temp = gv('f-temp');
+  const spo2 = gv('f-spo2'), glucose = gv('f-glucose');
+  const chest = gv('f-chest'), abdo = gv('f-abdo'), cns = gv('f-cns'), otherExam = gv('f-other-exam');
+  const crp = gv('f-crp'), wcc = gv('f-wcc'), neut = gv('f-neut'), eosino = gv('f-eosino');
+  const plt = gv('f-plt'), hba1c = gv('f-hba1c'), pct = gv('f-pct'), hb = gv('f-hb');
+  const otherInv = gv('f-other-inv');
+  const treatment = gv('f-treatment'), dischargeMeds = gv('f-discharge-meds');
+  const losDays = gv('f-los-days'), losReason = gv('f-los-reason'), dischargePlan = gv('f-discharge-plan');
+
+  let lines = [];
+
+  if (dxList.length > 0) {
+    dxList.forEach(dx => {
+      const cStr = dx.codes.length > 0 ? '   ' + dx.codes.join(' / ') : '';
+      lines.push(`# ${dx.name}${cStr}`);
+    });
+    lines.push('');
+  }
+
+  if (symptoms.length > 0) {
+    lines.push('Came in with:');
+    symptoms.forEach(s => lines.push(`  \u2713 ${s}`));
+    lines.push('');
+  }
+
+  const vitals = [];
+  if (bp) vitals.push(`Blood pressure:    ${bp} mmHg`);
+  if (pulse) vitals.push(`Pulse:             ${pulse} bpm`);
+  if (resp) vitals.push(`Respiratory rate:  ${resp}`);
+  if (temp) vitals.push(`Temperature:       ${temp}\u00b0C`);
+  if (spo2) vitals.push(`O\u2082 Saturation:     ${spo2}% on RA`);
+  if (glucose) vitals.push(`Blood glucose:     ${glucose}`);
+  if (vitals.length > 0) { vitals.forEach(v => lines.push(v)); lines.push(''); }
+
+  const examLines = [];
+  if (chest) examLines.push(`Chest:     ${chest}`);
+  if (abdo) examLines.push(`Abdomen:   ${abdo}`);
+  if (cns) examLines.push(`CNS:       ${cns}`);
+  if (otherExam) examLines.push(otherExam);
+  if (examLines.length > 0) { lines.push('On Examination:'); examLines.forEach(e => lines.push(`  ${e}`)); lines.push(''); }
+
+  const invLines = [];
+  if (crp) invLines.push(`CRP:          ${crp}`);
+  if (wcc) invLines.push(`WCC:          ${wcc}`);
+  if (neut) invLines.push(`Neutrophils:  ${neut}`);
+  if (eosino) invLines.push(`Eosinophils:  ${eosino}`);
+  if (plt) invLines.push(`Platelets:    ${plt}`);
+  if (hba1c) invLines.push(`HbA1c:        ${hba1c}`);
+  if (pct) invLines.push(`PCT:          ${pct}`);
+  if (hb) invLines.push(`Haemoglobin:  ${hb}`);
+  if (otherInv) invLines.push(otherInv);
+  if (invLines.length > 0) { lines.push('Blood results:'); invLines.forEach(i => lines.push(`  ${i}`)); lines.push(''); }
+
+  if (mt === 'extended') {
+    document.querySelectorAll('.day-block').forEach((block, idx) => {
+      const dbp = block.querySelector('.day-bp')?.value.trim();
+      const dgluc = block.querySelector('.day-gluc')?.value.trim();
+      const dnotes = block.querySelector('.day-notes')?.value.trim();
+      lines.push(`Day ${idx + 2}:`);
+      if (dbp) lines.push(`  BP: ${dbp}`);
+      if (dgluc) lines.push(`  Blood glucose: ${dgluc}`);
+      if (dnotes) lines.push(`  ${dnotes}`);
+      lines.push('');
+    });
+  }
+
+  if (treatment) { lines.push('Patient treated with:'); lines.push(`  ${treatment}`); lines.push(''); }
+  if (dischargeMeds) { lines.push(`Discharged on: ${dischargeMeds}`); lines.push(''); }
+
+  if (losDays || losReason) {
+    if (mt === 'initial') {
+      if (losDays && losReason) lines.push(`Please authorise length of stay for ${losDays} days to cover ${losReason}.`);
+      else if (losDays) lines.push(`Please authorise length of stay for ${losDays} days.`);
+      else lines.push(`Please authorise admission to cover ${losReason}.`);
+    } else {
+      if (losDays && losReason) lines.push(`Please extend LOS to ${losDays} days for ${losReason}.`);
+      else if (losDays) lines.push(`Please extend LOS to ${losDays} days.`);
+      else lines.push(`Please extend LOS to cover ${losReason}.`);
+    }
+  }
+  if (dischargePlan) lines.push(`Discharge plan: ${dischargePlan}`);
+
+  document.getElementById('output-box').textContent = lines.join('\n');
+  goStep(5);
+}
+
+function copyOut() {
+  const text = document.getElementById('output-box').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy Text'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function exportPDF() {
+  document.getElementById('print-date').textContent = 'Generated: ' + new Date().toLocaleDateString('en-ZA', { day:'2-digit', month:'long', year:'numeric' });
+  window.print();
+}
+
+function restart() {
+  if (!confirm('Start a new motivation? Current data will be cleared.')) return;
+  location.reload();
+}
+</script>
+</body>
+</html>
