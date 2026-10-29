@@ -114,9 +114,20 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1a2332;mi
 .print-hdr .ph1{font-size:15pt;font-weight:700;letter-spacing:2px;color:#1a3a5c;text-align:center}
 .print-hdr .ph2{font-size:9pt;color:#555;letter-spacing:1px;text-transform:uppercase;margin-top:3px;text-align:center}
 .print-hdr .ph3{font-size:9pt;color:#888;margin-top:5px;text-align:center}
+
+#authGate{position:fixed;inset:0;z-index:999;background:#eef2f7;display:flex;align-items:center;justify-content:center;padding:20px}
+#authGate .box{background:#fff;border:1px solid #d0d8e4;border-radius:10px;padding:28px 30px;width:100%;max-width:360px;text-align:center}
+#authGate h1{font-size:17px;color:#1a3a5c;margin-bottom:4px}
+#authGate p{font-size:12px;color:#718096;margin-bottom:16px;line-height:1.5}
+#authGate input{width:100%;padding:11px 13px;border:1.5px solid #cbd5e0;border-radius:8px;font-size:14px;margin-bottom:10px;font-family:inherit}
+#authGate button{width:100%;padding:11px;border:0;border-radius:8px;background:#1a3a5c;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+#authGate .err{color:#c53030;font-size:12px;margin-top:10px;min-height:16px}
+#signOutLink{background:none;border:1px solid #c8a951;color:#c8a951;border-radius:20px;font-size:10px;padding:3px 10px;cursor:pointer;margin-left:10px}
 </style>
 </head>
 <body>
+<div id="authGate"><div class="box"><h1>Medical Motivation Assistant</h1><p>HOSPITAL AT EKHAYA. Sign in with your Ekhaya Connect account.</p>
+<input type="email" id="gEmail" placeholder="Email" autocomplete="username"><input type="password" id="gPass" placeholder="Password" autocomplete="current-password"><button id="gBtn">Sign in</button><div class="err" id="gErr"></div></div></div>
 
 <div class="header">
   <div class="header-left">
@@ -351,7 +362,6 @@ let aiData = {};
 let extraSymptoms = [];
 let dayBlockCount = 0;
 
-const PROXY = 'https://hae-motivation-proxy.shakabornman.workers.dev';
 
 // ── ICD-10 lookup table (common SA private hospital codes) ──
 const ICD10_DB = [
@@ -620,30 +630,10 @@ async function analyseCase() {
   const btn = document.getElementById('analyseBtn');
   btn.classList.add('loading'); btn.disabled = true;
 
-  const prompt = `You are a South African clinical coding assistant for a private hospital. Analyse this case description and extract structured clinical data.
-
-Case: "${text}"
-
-Respond ONLY with valid JSON (no markdown):
-{
-  "diagnoses": [{"name":"","codes":[""],"reason":"","confidence":"high|medium|low"}],
-  "extracted": {
-    "age":"","sex":"","bp":"","pulse":"","resp":"","temp":"","spo2":"","glucose":"",
-    "crp":"","wcc":"","hba1c":"","pct":"","chest":"","abdomen":"","cns":"",
-    "treatment":"","discharge_meds":"","los_days":"","los_reason":"","symptoms":[]
-  }
-}
-Rules: correct ICD-10 codes for SA private billing, primary diagnosis first, extract all numeric values, symptoms as short strings, empty string if not mentioned.`;
-
   try {
-    const res = await fetch(PROXY, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({model:'claude-sonnet-4-6', max_tokens:1000, messages:[{role:'user',content:prompt}]})
-    });
-    const data = await res.json();
-    const raw = data.content[0].text.replace(/```json|```/g,'').trim();
-    aiData = JSON.parse(raw);
+    const aiRes = await window.haeAi({ task: 'motivation', text });
+    const raw = aiRes.data.result;
+    aiData = raw;
     renderDiagnoses(aiData.diagnoses);
     prefillFields(aiData.extracted);
     btn.classList.remove('loading'); btn.disabled = false;
@@ -903,6 +893,36 @@ function restart() {
 window.addEventListener('DOMContentLoaded', () => {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('p-submit-date').value = today;
+});
+</script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+const app = initializeApp({ apiKey: "AIzaSyBla6UBluNcWVKPSU8U30IuTSubLb7R2Kc", authDomain: "hae-vuma-92fca.firebaseapp.com", projectId: "hae-vuma-92fca", storageBucket: "hae-vuma-92fca.firebasestorage.app", messagingSenderId: "1052424261313", appId: "1:1052424261313:web:a4bebe68d6f9ba14fa0e40" });
+const auth = getAuth(app), db = getFirestore(app);
+// AI analysis goes through the signed-in function aiAssist (EC-049); the prompt and key live on the server.
+window.haeAi = httpsCallable(getFunctions(app, 'europe-west1'), 'aiAssist');
+const ALLOWED = ['executive', 'finance', 'nursing'];
+const $ = (id) => document.getElementById(id);
+$('gBtn').addEventListener('click', async () => {
+  $('gErr').textContent = '';
+  try { await signInWithEmailAndPassword(auth, $('gEmail').value.trim(), $('gPass').value); }
+  catch (e) { $('gErr').textContent = 'Sign-in failed. Check your email and password.'; }
+});
+$('gPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('gBtn').click(); });
+function ensureSignOut() {
+  if ($('signOutLink')) return;
+  const b = document.createElement('button'); b.id = 'signOutLink'; b.textContent = 'Sign out';
+  b.onclick = () => signOut(auth); document.querySelector('.header .version-badge').after(b);
+}
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { $('authGate').style.display = 'flex'; return; }
+  let levels = [];
+  try { const d = await getDoc(doc(db, 'access_control', user.uid)); levels = d.exists() ? (d.data().accessLevels || []) : []; } catch (e) { levels = []; }
+  if (levels.some((l) => ALLOWED.includes(l))) { $('authGate').style.display = 'none'; $('gErr').textContent = ''; ensureSignOut(); }
+  else { await signOut(auth); $('authGate').style.display = 'flex'; $('gErr').textContent = 'Your account does not have access to this tool. Contact the COO.'; }
 });
 </script>
 </body>
